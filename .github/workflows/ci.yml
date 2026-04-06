@@ -85,22 +85,44 @@ jobs:
         echo "✅ Build completed successfully"
         echo "Python version: $(python --version)"
 
-  deploy:
-    runs-on: ubuntu-latest
-    needs: build
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Download artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: python-app
-    
-    - name: Deploy notification
-      run: |
-        echo "✅ Build and tests passed!"
-        echo "Application ready for deployment"
-        echo "Commit: ${{ github.sha }}"
+deploy:
+  runs-on: ubuntu-latest
+  needs: build
+  if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+  
+  steps:
+  - name: Checkout code
+    uses: actions/checkout@v4
+  
+  - name: Deploy to EC2
+    env:
+      EC2_HOST: ${{ secrets.EC2_HOST }}
+      EC2_USER: ${{ secrets.EC2_USER }}
+      EC2_PRIVATE_KEY: ${{ secrets.EC2_PRIVATE_KEY }}
+    run: |
+      # Create SSH directory
+      mkdir -p ~/.ssh
+      
+      # Add EC2 key
+      echo "$EC2_PRIVATE_KEY" > ~/.ssh/id_rsa
+      chmod 600 ~/.ssh/id_rsa
+      
+      # Add EC2 to known_hosts
+      ssh-keyscan -H $EC2_HOST >> ~/.ssh/known_hosts 2>/dev/null
+      
+      # Copy code to EC2
+      scp -i ~/.ssh/id_rsa -r . $EC2_USER@$EC2_HOST:/home/ubuntu/my-python-app/
+      
+      # Run deployment script on EC2
+      ssh -i ~/.ssh/id_rsa $EC2_USER@$EC2_HOST 'bash /home/ubuntu/deploy.sh'
+      
+      echo "✅ Deployment to EC2 complete!"
+  
+  - name: Verify Deployment
+    env:
+      EC2_HOST: ${{ secrets.EC2_HOST }}
+    run: |
+      sleep 3
+      curl -s http://$EC2_HOST:5000/ | head -20
+      echo ""
+      echo "✅ Application is live!"
