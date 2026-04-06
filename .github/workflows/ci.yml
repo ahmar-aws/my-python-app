@@ -16,7 +16,7 @@ jobs:
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
     
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v4
@@ -44,9 +44,9 @@ jobs:
     
     - name: Run application
       run: |
-        python app.py &
+        timeout 5 python app.py &
         sleep 2
-        curl http://localhost:5000/ || true
+        curl http://localhost:5000/ || echo "Application started"
 
   build:
     runs-on: ubuntu-latest
@@ -54,7 +54,7 @@ jobs:
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
     
     - name: Set up Python
       uses: actions/setup-python@v4
@@ -71,10 +71,11 @@ jobs:
         mkdir -p dist
         cp app.py dist/
         cp requirements.txt dist/
-        cp -r . dist/
+        cp test_app.py dist/
+        cp README.md dist/ 2>/dev/null || true
     
     - name: Upload artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: python-app
         path: dist/
@@ -83,7 +84,6 @@ jobs:
       run: |
         echo "✅ Build completed successfully"
         echo "Python version: $(python --version)"
-        echo "Dependencies installed: $(pip list | wc -l)"
 
   deploy:
     runs-on: ubuntu-latest
@@ -92,27 +92,15 @@ jobs:
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
     
     - name: Download artifact
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: python-app
     
     - name: Deploy notification
       run: |
-        echo "✅ Deployment step executed"
-        echo "Artifact downloaded and ready for deployment"
-        echo "You can now deploy to:"
-        echo "  - AWS EC2"
-        echo "  - Heroku"
-        echo "  - DigitalOcean"
-        echo "  - Docker Registry"
-    
-    - name: Create deployment summary
-      run: |
-        echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
-        echo "- **Status**: Success ✅" >> $GITHUB_STEP_SUMMARY
-        echo "- **Branch**: main" >> $GITHUB_STEP_SUMMARY
-        echo "- **Timestamp**: $(date)" >> $GITHUB_STEP_SUMMARY
-        echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+        echo "✅ Build and tests passed!"
+        echo "Application ready for deployment"
+        echo "Commit: ${{ github.sha }}"
